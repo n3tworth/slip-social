@@ -91,7 +91,7 @@
       });
 
       // Sports tags
-      var sportsContainer = clone.querySelector('.mos.list');
+      var sportsContainer = clone.querySelector('.my-sports-list');
       if (sportsContainer && Array.isArray(member.sports)) {
         member.sports.forEach(function (sport) {
           var tag = document.createElement('p');
