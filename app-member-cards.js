@@ -70,7 +70,7 @@
       if (hitRateEls[0] && hitRateEls[1]) {
         if (member.hit_rate === 'N/A') {
           hitRateEls[0].textContent = 'N/A';
-          hitRateEls[1].textContent = ' hit rate';
+          hitRateEls[1].textContent = '\u00A0hit rate';
         } else {
           var rounded = Math.round(parseFloat(member.hit_rate) * 10) / 10;
           hitRateEls[0].textContent = rounded;
