@@ -19,15 +19,24 @@
        in" branch below is dead code in practice, not a bug.
      SlipSocial.fetchXano(path, opts?) -> matches as originally called
        here; no changes needed.
-     SlipSocial.cloneAndFill(templateEl, data, fieldMap) -> THIS WAS
-       WRONG in the previous version. Real signature is 3 args: a raw
-       data object, plus a fieldMap keyed by CSS SELECTOR (not field
-       name), whose values are either a property name to read off
-       `data` or a function (el, data) => {...}. Calling it with only
-       (template, fields) left fieldMap undefined, which throws inside
-       cloneAndFill on Object.keys(fieldMap) — silently swallowed by
-       load()'s catch, resulting in an empty dropdown and a frozen
-       badge. Fixed in buildRow() below.
+     SlipSocial.cloneAndFill(templateEl, data, fieldMap) -> Real signature
+       is 3 args: a raw data object, plus a fieldMap keyed by CSS SELECTOR
+       (not field name), whose values are either a property name to read
+       off `data` or a function (el, data) => {...}. Fixed in buildRow()
+       below (previous version called it with only 2 args).
+
+   Second bug found (Xano confirmed returning real items; rows were being
+   appended but staying invisible): when the Webflow HTML importer first
+   brought in the template's `style="display:none"`, it auto-generated a
+   combo class (e.g. "inline-article-0") whose only property is
+   `display: none`, and attached it to the template element alongside the
+   inline style. cloneNode(true) inside cloneAndFill copies that class onto
+   every clone. Clearing `row.style.display = ''` only removes the INLINE
+   style — the class-level `display:none` still wins, so rows sat in the
+   DOM correctly filled with real data, just invisible. Fixed below by
+   stripping any "inline-article-N" class off the clone. Matched by pattern
+   rather than the exact name so this survives the template being rebuilt
+   again with a different auto-generated number.
    ============================================================ */
 (function () {
   'use strict';
@@ -65,6 +74,15 @@
     return Math.floor(d / 7) + 'w ago';
   }
 
+  // Strip any auto-generated "inline-article-N" hide-class the Webflow
+  // HTML importer attached to the template (carries display:none as a
+  // combo class, separate from the inline style we already clear).
+  function stripInlineHideClass(el) {
+    Array.prototype.slice.call(el.classList).forEach(function (cls) {
+      if (/^inline-article-\d+$/.test(cls)) el.classList.remove(cls);
+    });
+  }
+
   // --- Row construction ----------------------------------------------------
   function buildRow(item) {
     // cloneAndFill(templateEl, data, fieldMap) — fieldMap keys are CSS
@@ -82,6 +100,7 @@
 
     row.removeAttribute('data-template');
     row.style.display = '';
+    stripInlineHideClass(row);
     applyReadState(row, item.is_read);
     return row;
   }
