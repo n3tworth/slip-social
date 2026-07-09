@@ -20,6 +20,14 @@
    every seed member until one is populated for testing) — the
    element is hidden entirely in that case rather than showing a
    blank or placeholder label.
+
+   Color-coding: text color is NOT set here. It's controlled by 4
+   combo classes defined in Designer on this element (is-free,
+   is-rookie, is-lock, is-sharp), each just setting Text Color to the
+   matching brand variable (Dust, Blue, Sky, Chartreuse respectively).
+   This script only toggles which one is present, per this project's
+   convention of keeping color decisions in Designer, not hardcoded
+   in JS.
    ============================================================ */
 (function () {
   'use strict';
@@ -35,12 +43,29 @@
     sharp_shooter: 'Sharp Shooter'
   };
 
+  // Xano value -> Designer combo class. lock_star/sharp_shooter collapse
+  // to is-lock/is-sharp to match the shorter combo class names set up
+  // in Designer (matches the mockup's existing ctb-lock/ctb-sharp pattern).
+  var TIER_CLASSES = {
+    free: 'is-free',
+    rookie: 'is-rookie',
+    lock_star: 'is-lock',
+    sharp_shooter: 'is-sharp'
+  };
+  var ALL_TIER_CLASSES = ['is-free', 'is-rookie', 'is-lock', 'is-sharp'];
+
   S.getMemberstackId()
     .then(function (memberstackId) {
       return S.fetchXano('members/' + memberstackId);
     })
     .then(function (member) {
       var tier = member && member.capper_tier;
+
+      // Always clear any previously applied tier class before reapplying —
+      // safe even on first load, and keeps this idempotent if ever re-run.
+      ALL_TIER_CLASSES.forEach(function (cls) {
+        el.classList.remove(cls);
+      });
 
       if (!tier) {
         // No tier assigned — Tailer, or a Capper/Hybrid with no tier set yet.
@@ -52,6 +77,12 @@
       // four (capper_tier is a plain text column, not schema-enforced) —
       // surfacing an unexpected value is more useful than silently hiding it.
       el.textContent = TIER_LABELS[tier] || tier;
+
+      var tierClass = TIER_CLASSES[tier];
+      if (tierClass) el.classList.add(tierClass);
+      // If tier is an unrecognized value, no combo class gets added —
+      // label still shows (raw value), just without tier coloring.
+
       el.style.display = '';
     })
     .catch(function (err) {
