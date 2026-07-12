@@ -625,6 +625,23 @@
     panel.querySelectorAll('[data-injected-slip]').forEach(function (el) { el.remove(); });
     template.style.display = 'none';
 
+    var emptyEl = document.querySelector('[data-slip-empty="' + scope + '"]');
+    var emptyTextEl = emptyEl ? emptyEl.querySelector('[data-slip-empty-text]') : null;
+    var emptyLinkEl = emptyEl ? emptyEl.querySelector('[data-slip-empty-link]') : null;
+    if (emptyEl) {
+      if (cache.length === 0) {
+        if (emptyTextEl) emptyTextEl.textContent = 'No recent slips to show. Try adding one...';
+        if (emptyLinkEl) emptyLinkEl.style.display = ''; // only makes sense when there are truly zero slips
+        emptyEl.style.display = '';
+      } else if (filtered.length === 0) {
+        if (emptyTextEl) emptyTextEl.textContent = 'No slips match this filter.';
+        if (emptyLinkEl) emptyLinkEl.style.display = 'none'; // adding a slip won't fix a filter mismatch
+        emptyEl.style.display = '';
+      } else {
+        emptyEl.style.display = 'none';
+      }
+    }
+
     filtered.forEach(function (row) {
       var clone = template.cloneNode(true);
       clone.removeAttribute('data-slip-item-template');
