@@ -340,6 +340,17 @@
       // otherwise show only the clicked one, hide the other two
       el.classList.toggle('is-visible', !alreadyOpen && key === which);
     });
+
+    // Scroll the media lineup into view on open (not close), so the user
+    // can see items land as they click through stickers/GIFs/slips.
+    if (!alreadyOpen) {
+      var lineup = document.getElementById('media-lineup');
+      if (lineup) {
+        lineup.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        console.warn('#media-lineup not found -- add that id to the carousel/lineup element for auto-scroll to work.');
+      }
+    }
   }
 
   // ============================================================
@@ -528,7 +539,10 @@
       var scope = panel.getAttribute('data-klipy-picker');
       var searchWrap = document.querySelector('[data-klipy-search="' + scope + '"]');
       var results = document.querySelector('[data-klipy-results="' + scope + '"]');
-      if (!searchWrap || !results) return;
+      if (!searchWrap || !results) {
+        console.warn('Klipy panel found but data-klipy-search or data-klipy-results element is missing for scope "' + scope + '"');
+        return;
+      }
 
       var input = document.createElement('input');
       input.type = 'text';
@@ -546,22 +560,30 @@
           if (q) {
             searchKlipy(scope, q, results);
           } else {
-            loadRecentGifs(scope, results); // empty search box -- fall back to Recent
+            loadDefaultKlipyView(scope, results); // empty search box -- Recent, falling back to Trending
           }
         }, 400);
       });
 
-      // Show Recent by default the first time this panel becomes visible,
-      // before anyone's typed anything -- same lazy-load-once pattern as
-      // the sticker/slip pickers.
-      var loadedRecent = false;
+      // Load the default view (Recent -> Trending) the first time this
+      // panel becomes visible, before anyone's typed anything.
+      var loadedDefault = false;
       var observer = new MutationObserver(function () {
-        if (panel.classList.contains('is-visible') && !loadedRecent && !input.value.trim()) {
-          loadedRecent = true;
-          loadRecentGifs(scope, results);
+        if (panel.classList.contains('is-visible') && !loadedDefault && !input.value.trim()) {
+          loadedDefault = true;
+          console.log('[Klipy] panel opened, loading default view for scope "' + scope + '"');
+          loadDefaultKlipyView(scope, results);
         }
       });
       observer.observe(panel, { attributes: true, attributeFilter: ['class'] });
+
+      // In case the panel is already visible at init time (e.g. is-visible
+      // was left on in Designer during testing), the class-change observer
+      // above wouldn't fire since nothing changes -- check once up front too.
+      if (panel.classList.contains('is-visible') && !loadedDefault) {
+        loadedDefault = true;
+        loadDefaultKlipyView(scope, results);
+      }
     });
   }
 
@@ -571,27 +593,63 @@
       : Promise.resolve('anon');
   }
 
-  function loadRecentGifs(scope, resultsEl) {
-    getMemberstackIdOrAnon().then(function (customerId) {
-      // Confirmed from Partner Panel: customer_id IS a path segment here
-      // (unlike Search, where it's a query param) -- different convention
-      // per endpoint, not a typo.
-      var url = 'https://api.klipy.com/api/v1/' + KLIPY_API_KEY + '/gifs/recent/' + encodeURIComponent(customerId)
-        + '?page=1&per_page=24';
+  // Low-level fetch + parse, shared by Recent/Trending/Search. Returns a
+  // Promise of the raw parsed response (or null for a 204/empty body).
+  function fetchKlipyJson(url) {
+    console.log('[Klipy] requesting', url);
+    return fetch(url, { headers: { 'Content-Type': 'application/json' } }).then(function (r) {
+      console.log('[Klipy] response status', r.status, 'for', url);
+      if (r.status === 204) return null;
+      if (!r.ok) throw new Error('Klipy request failed with status ' + r.status);
+      return r.json();
+    });
+  }
 
-      return fetch(url, { headers: { 'Content-Type': 'application/json' } }).then(function (r) {
-        if (r.status === 204) return null;
-        return r.json();
+  function extractKlipyItems(data) {
+    return (data && data.data && data.data.data) || [];
+  }
+
+  // Recent -> Trending cascade, per the intended default-view order.
+  function loadDefaultKlipyView(scope, resultsEl) {
+    getMemberstackIdOrAnon().then(function (customerId) {
+      var recentUrl = 'https://api.klipy.com/api/v1/' + KLIPY_API_KEY + '/gifs/recent/' + encodeURIComponent(customerId)
+        + '?page=1&per_page=24';
+      return fetchKlipyJson(recentUrl).then(function (data) {
+        var items = extractKlipyItems(data);
+        if (items.length > 0) {
+          console.log('[Klipy] showing Recent,', items.length, 'items');
+          renderKlipyItemList(items, scope, resultsEl);
+        } else {
+          console.log('[Klipy] Recent was empty, falling back to Trending');
+          return loadTrendingGifs(scope, resultsEl);
+        }
       });
-    }).then(function (data) {
-      renderKlipyItems(data, scope, resultsEl);
     }).catch(function (err) {
-      console.error('Klipy recent failed', err);
+      console.error('[Klipy] Recent failed, falling back to Trending', err);
+      return loadTrendingGifs(scope, resultsEl);
+    });
+  }
+
+  function loadTrendingGifs(scope, resultsEl) {
+    return getMemberstackIdOrAnon().then(function (customerId) {
+      // Confirmed from Partner Panel: customer_id is a query param here
+      // (same convention as Search).
+      var url = 'https://api.klipy.com/api/v1/' + KLIPY_API_KEY + '/gifs/trending'
+        + '?customer_id=' + encodeURIComponent(customerId)
+        + '&page=1&per_page=24';
+      return fetchKlipyJson(url);
+    }).then(function (data) {
+      var items = extractKlipyItems(data);
+      console.log('[Klipy] showing Trending,', items.length, 'items');
+      renderKlipyItemList(items, scope, resultsEl);
+    }).catch(function (err) {
+      console.error('[Klipy] Trending also failed', err);
+      resultsEl.innerHTML = '';
     });
   }
 
   function searchKlipy(scope, query, resultsEl) {
-    if (!query) { loadRecentGifs(scope, resultsEl); return; }
+    if (!query) { loadDefaultKlipyView(scope, resultsEl); return; }
 
     getMemberstackIdOrAnon().then(function (customerId) {
       // Confirmed from Partner Panel: customer_id is a query param here.
@@ -599,23 +657,17 @@
         + '?q=' + encodeURIComponent(query)
         + '&customer_id=' + encodeURIComponent(customerId)
         + '&page=1&per_page=24';
-
-      return fetch(url, { headers: { 'Content-Type': 'application/json' } }).then(function (r) {
-        if (r.status === 204) return null;
-        return r.json();
-      });
+      return fetchKlipyJson(url);
     }).then(function (data) {
-      renderKlipyItems(data, scope, resultsEl);
+      renderKlipyItemList(extractKlipyItems(data), scope, resultsEl);
     }).catch(function (err) {
-      console.error('Klipy search failed', err);
+      console.error('[Klipy] Search failed', err);
     });
   }
 
-  // Shared by Search and Recent -- both return the identical response shape.
-  function renderKlipyItems(data, scope, resultsEl) {
+  // Shared rendering, given an already-extracted items array.
+  function renderKlipyItemList(items, scope, resultsEl) {
     resultsEl.innerHTML = '';
-    if (!data) return; // zero results / 204
-    var items = (data && data.data && data.data.data) || [];
     items.forEach(function (item) {
       if (!item.file) return;
       var thumbUrl = item.file.sm && item.file.sm.gif && item.file.sm.gif.url;
