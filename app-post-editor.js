@@ -280,6 +280,17 @@
     state.mediaItems.push(item);
     renderSlots(scope);
     scheduleAutosave(scope);
+
+    // Confirmation feedback that a selection actually landed -- scroll the
+    // lineup into view so the user sees it fill in, rather than wondering
+    // if their click on the sticker/GIF/slip did anything.
+    var lineup = document.getElementById('media-lineup');
+    if (lineup) {
+      lineup.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      console.warn('#media-lineup not found -- add that id to the carousel/lineup element for auto-scroll to work.');
+    }
+
     return true;
   }
 
@@ -339,30 +350,6 @@
       // if the clicked panel was already open, close everything (second click = close);
       // otherwise show only the clicked one, hide the other two
       el.classList.toggle('is-visible', !alreadyOpen && key === which);
-    });
-  }
-
-  // Watches the three picker panels directly (rather than firing inside
-  // showPanel's synchronous click handler) so the scroll happens after the
-  // browser has actually applied the visibility change and laid out the
-  // now-visible panel -- doing it synchronously with the class toggle was
-  // measuring against the old, still-collapsed layout, producing a scroll
-  // to the wrong position.
-  function initPickerScrollToLineup() {
-    ['[data-sticker-picker]', '[data-klipy-picker]', '[data-slip-picker]'].forEach(function (selector) {
-      document.querySelectorAll(selector).forEach(function (panel) {
-        var observer = new MutationObserver(function () {
-          if (panel.classList.contains('is-visible')) {
-            var lineup = document.getElementById('media-lineup');
-            if (lineup) {
-              lineup.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            } else {
-              console.warn('#media-lineup not found -- add that id to the carousel/lineup element for auto-scroll to work.');
-            }
-          }
-        });
-        observer.observe(panel, { attributes: true, attributeFilter: ['class'] });
-      });
     });
   }
 
@@ -1035,7 +1022,6 @@
     initSlipPicker();
     initSchedule();
     initPublishCancelDraft();
-    initPickerScrollToLineup();
   }
 
   if (document.readyState === 'loading') {
