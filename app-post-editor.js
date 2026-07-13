@@ -261,6 +261,7 @@
     mediaEl.style.inset = '0';
     mediaEl.style.width = '100%';
     mediaEl.style.height = '100%';
+    mediaEl.style.objectFit = 'contain'; // lineup wants contain; sticker picker's own grid keeps cover via its class
     mediaEl.style.zIndex = '1';
     mediaEl.addEventListener('click', function () {
       removeMediaItem(scope, index);
@@ -547,14 +548,27 @@
 
   function searchKlipy(scope, query, resultsEl) {
     if (!query) { resultsEl.innerHTML = ''; return; }
-    var customerId = (window.SlipSocial.getMemberstackId && window.SlipSocial.getMemberstackId()) || 'anon';
-    // See file-header NOTE -- path/param names here are the best-confirmed
-    // guess, not a verified spec. Adjust to match Klipy's actual search docs.
-    var url = 'https://api.klipy.com/api/v1/' + KLIPY_API_KEY + '/gifs/search/' + customerId +
-      '?q=' + encodeURIComponent(query);
 
-    fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+    // getMemberstackId() is asynchronous (returns a Promise) -- it must be
+    // resolved before the URL is built, or its value stringifies to the
+    // literal text "[object Promise]" instead of an actual id.
+    var idPromise = window.SlipSocial.getMemberstackId
+      ? window.SlipSocial.getMemberstackId().catch(function () { return 'anon'; })
+      : Promise.resolve('anon');
+
+    idPromise.then(function (customerId) {
+      // See file-header NOTE -- path/param names here are the best-confirmed
+      // guess, not a verified spec. Adjust to match Klipy's actual search docs.
+      var url = 'https://api.klipy.com/api/v1/' + KLIPY_API_KEY + '/gifs/search/' + customerId +
+        '?q=' + encodeURIComponent(query);
+
+      return fetch(url).then(function (r) {
+        if (r.status === 204) return null; // no content -- treat as zero results, don't attempt to parse
+        return r.json();
+      });
+    }).then(function (data) {
       resultsEl.innerHTML = '';
+      if (!data) return; // zero results
       // Confirmed real shape: { result, data: { data: [...items], current_page, per_page, has_next } }
       // Each item: file.{hd,md,sm,xs}.{gif,webp,jpg,mp4,webm}.url
       var items = (data && data.data && data.data.data) || [];
