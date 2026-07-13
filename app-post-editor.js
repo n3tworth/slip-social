@@ -433,6 +433,9 @@
         input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Search stickers';
+        input.style.background = 'transparent';
+        input.style.border = 'none';
+        input.style.outline = 'none';
         searchWrap.appendChild(input);
         input.addEventListener('input', function () {
           renderStickers(scope, input.value.trim().toLowerCase());
@@ -472,8 +475,19 @@
       clone.setAttribute('data-injected-sticker', 'true');
       clone.setAttribute('data-sticker-id', row.id);
       clone.style.display = '';
-      var img = clone.querySelector('img') || clone;
+      clone.style.position = clone.style.position || 'relative'; // needed for the absolute image below
+
+      // Same issue as the carousel slots had: the template box likely has no
+      // real <img> tag inside it (just an empty placeholder div), so create
+      // one fresh each time rather than assuming one exists to set .src on.
+      var img = document.createElement('img');
       img.src = row.gif_url;
+      img.classList.add('data-slot'); // reuse the same object-fit:cover treatment
+      img.style.position = 'absolute';
+      img.style.inset = '0';
+      img.style.width = '100%';
+      img.style.height = '100%';
+      clone.appendChild(img);
 
       clone.addEventListener('click', function () {
         var state = getState(scope);
@@ -516,6 +530,9 @@
       var input = document.createElement('input');
       input.type = 'text';
       input.placeholder = 'Search KLIPY'; // required attribution wording per Klipy's brand guidelines
+      input.style.background = 'transparent';
+      input.style.border = 'none';
+      input.style.outline = 'none';
       searchWrap.appendChild(input);
 
       var debounceTimer = null;
