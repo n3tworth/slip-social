@@ -475,6 +475,7 @@
       clone.setAttribute('data-injected-sticker', 'true');
       clone.setAttribute('data-sticker-id', row.id);
       clone.style.display = '';
+      clone.style.cursor = 'pointer';
       clone.style.position = clone.style.position || 'relative'; // needed for the absolute image below
 
       // Same issue as the carousel slots had: the template box likely has no
@@ -689,6 +690,7 @@
       clone.setAttribute('data-injected-slip', 'true');
       clone.setAttribute('data-slip-id', row.id);
       clone.style.display = '';
+      clone.style.cursor = 'pointer';
 
       var img = clone.querySelector('.data-slot');
       var textEl = clone.querySelector('[data-slip-text]');
