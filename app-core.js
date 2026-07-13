@@ -68,7 +68,8 @@
 
   // path         - e.g. 'members/mem_sb_xxx/suggested-follows' (leading slash optional)
   // options.method  - defaults to 'GET'
-  // options.body    - plain object, will be JSON-stringified
+  // options.body    - plain object (JSON-stringified) OR a FormData
+  //                    instance (passed through as-is, for file uploads)
   // options.headers - any extra headers to merge in
   // options.auth    - defaults to true; attaches the member's session
   //                    token as an Authorization header automatically.
@@ -77,10 +78,17 @@
   function fetchXano(path, options) {
     options = options || {};
     var url = XANO_BASE_URL + String(path).replace(/^\//, '');
-    var headers = Object.assign(
-      { 'Content-Type': 'application/json' },
-      options.headers || {}
-    );
+
+    // FormData (file uploads) must NOT be JSON-stringified, and must NOT
+    // get a manually-set Content-Type -- the browser sets its own
+    // multipart boundary automatically. JSON.stringify(formData) produces
+    // "{}", silently discarding the actual file, which is exactly what
+    // was happening before this fix.
+    var isFormData = (typeof FormData !== 'undefined') && (options.body instanceof FormData);
+
+    var headers = isFormData
+      ? Object.assign({}, options.headers || {})
+      : Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
 
     if (options.auth !== false) {
       var token = getMemberstackToken();
@@ -91,7 +99,7 @@
 
     var fetchOptions = { method: options.method || 'GET', headers: headers };
     if (options.body) {
-      fetchOptions.body = JSON.stringify(options.body);
+      fetchOptions.body = isFormData ? options.body : JSON.stringify(options.body);
     }
 
     return fetch(url, fetchOptions).then(function (response) {
