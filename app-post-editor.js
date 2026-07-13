@@ -252,6 +252,16 @@
     mediaEl.classList.add('data-slot');
     mediaEl.setAttribute('data-injected-media', 'true');
     mediaEl.style.cursor = 'pointer';
+    // Absolute overlay covering the slot edge-to-edge, rather than a normal
+    // flex child subject to the box's own layout (padding/centering/etc) --
+    // that mismatch is very likely why the image looked "styled" instead of
+    // replacing the template underneath. Requires the slot itself to have
+    // position:relative in Designer (see note below).
+    mediaEl.style.position = 'absolute';
+    mediaEl.style.inset = '0';
+    mediaEl.style.width = '100%';
+    mediaEl.style.height = '100%';
+    mediaEl.style.zIndex = '1';
     mediaEl.addEventListener('click', function () {
       removeMediaItem(scope, index);
     });
