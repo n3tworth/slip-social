@@ -186,7 +186,7 @@
   // 3. Media carousel -- shared 10 slots
   // ============================================================
   function initMediaSlots() {
-    document.querySelectorAll('[data-media-slots]').forEach(function (container) {
+    document.querySelectorAll('[data-slot-container]').forEach(function (container) {
       var template = container.querySelector('[data-slot-template]');
       if (!template) return;
 
@@ -208,14 +208,18 @@
               e.preventDefault();
               removeMediaItem(scope, slotIndex);
             };
-          })(idx, container.getAttribute('data-media-slots')));
+          })(idx, container.getAttribute('data-slot-container')));
         }
       }
     });
   }
 
+  function getSlotPanel(scope) {
+    return document.querySelector('[data-media-slots="' + scope + '"]'); // outer wrapper -- show/hide target
+  }
+
   function getSlotsContainer(scope) {
-    return document.querySelector('[data-media-slots="' + scope + '"]');
+    return document.querySelector('[data-slot-container="' + scope + '"]'); // inner flex row-wrap -- clone/fill target
   }
 
   function renderSlots(scope) {
@@ -317,7 +321,7 @@
 
   function showPanel(scope, which) {
     var panels = {
-      slots: getSlotsContainer(scope),
+      slots: getSlotPanel(scope),
       sticker: document.querySelector('[data-sticker-picker="' + scope + '"]'),
       klipy: document.querySelector('[data-klipy-picker="' + scope + '"]'),
       slip: document.querySelector('[data-slip-picker="' + scope + '"]')
