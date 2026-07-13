@@ -370,7 +370,15 @@
   }
 
   function handleUpload(scope, file, type) {
-    var maxMB = type === 'video' ? MAX_VIDEO_MB : MAX_IMAGE_MB;
+    if (type === 'video') {
+      // Xano's free plan doesn't support video storage yet (image storage
+      // does) -- checked client-side to avoid a wasted round-trip; server
+      // enforces this too, so this stays correct even if bypassed.
+      showMediaWarning(scope, 'Video uploads aren\'t available yet.');
+      return;
+    }
+
+    var maxMB = MAX_IMAGE_MB;
     if (file.size > maxMB * 1024 * 1024) {
       showMediaWarning(scope, 'File too large (max ' + maxMB + 'MB)');
       return;
@@ -380,16 +388,15 @@
     var formData = new FormData();
     formData.append('file', file);
 
-    // NOTE: verify window.SlipSocial.fetchXano passes FormData through as-is
-    // (no JSON.stringify, no manually-set Content-Type) -- the browser needs
-    // to set its own multipart boundary.
     window.SlipSocial.fetchXano('/media-upload', { method: 'POST', body: formData })
       .then(function (res) {
         addMediaItem(scope, { type: type, url: res.url, ref_id: null, text: null, result: null, posted_at: null });
       })
       .catch(function (err) {
         console.error('Upload failed', err);
-        showMediaWarning(scope, 'Upload failed, try again.');
+        // Surface Xano's actual message when there is one, rather than a
+        // generic string that hides what really happened.
+        showMediaWarning(scope, (err && err.message) ? err.message.replace('[SlipSocial] ', '') : 'Upload failed, try again.');
       });
   }
 
