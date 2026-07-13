@@ -214,10 +214,6 @@
     });
   }
 
-  function getSlotPanel(scope) {
-    return document.querySelector('[data-media-slots="' + scope + '"]'); // outer wrapper -- show/hide target
-  }
-
   function getSlotsContainer(scope) {
     return document.querySelector('[data-slot-container="' + scope + '"]'); // inner flex row-wrap -- clone/fill target
   }
@@ -305,23 +301,21 @@
     document.querySelectorAll('[data-media-trigger]').forEach(function (btn) {
       var scope = btn.getAttribute('data-media-trigger');
       var type = btn.getAttribute('data-media-type');
-      if (!type) return; // photo/video file-input triggers handled in initMediaUpload
+      if (!type) return; // photo/video file-input triggers handled entirely in initMediaUpload now
 
-      if (type === 'photo' || type === 'video') {
-        btn.addEventListener('click', function () { showPanel(scope, 'slots'); });
-      } else if (type === 'sticker') {
+      if (type === 'sticker') {
         btn.addEventListener('click', function () { showPanel(scope, 'sticker'); });
       } else if (type === 'gif') {
         btn.addEventListener('click', function () { showPanel(scope, 'klipy'); });
       } else if (type === 'slip') {
         btn.addEventListener('click', function () { showPanel(scope, 'slip'); });
       }
+      // photo/video: no panel to show anymore -- the 10 slots are always visible now
     });
   }
 
   function showPanel(scope, which) {
     var panels = {
-      slots: getSlotPanel(scope),
       sticker: document.querySelector('[data-sticker-picker="' + scope + '"]'),
       klipy: document.querySelector('[data-klipy-picker="' + scope + '"]'),
       slip: document.querySelector('[data-slip-picker="' + scope + '"]')
