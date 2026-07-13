@@ -542,58 +542,95 @@
       input.addEventListener('input', function () {
         clearTimeout(debounceTimer);
         var q = input.value.trim();
-        debounceTimer = setTimeout(function () { searchKlipy(scope, q, results); }, 400);
+        debounceTimer = setTimeout(function () {
+          if (q) {
+            searchKlipy(scope, q, results);
+          } else {
+            loadRecentGifs(scope, results); // empty search box -- fall back to Recent
+          }
+        }, 400);
       });
+
+      // Show Recent by default the first time this panel becomes visible,
+      // before anyone's typed anything -- same lazy-load-once pattern as
+      // the sticker/slip pickers.
+      var loadedRecent = false;
+      var observer = new MutationObserver(function () {
+        if (panel.classList.contains('is-visible') && !loadedRecent && !input.value.trim()) {
+          loadedRecent = true;
+          loadRecentGifs(scope, results);
+        }
+      });
+      observer.observe(panel, { attributes: true, attributeFilter: ['class'] });
+    });
+  }
+
+  function getMemberstackIdOrAnon() {
+    return window.SlipSocial.getMemberstackId
+      ? window.SlipSocial.getMemberstackId().catch(function () { return 'anon'; })
+      : Promise.resolve('anon');
+  }
+
+  function loadRecentGifs(scope, resultsEl) {
+    getMemberstackIdOrAnon().then(function (customerId) {
+      // Confirmed from Partner Panel: customer_id IS a path segment here
+      // (unlike Search, where it's a query param) -- different convention
+      // per endpoint, not a typo.
+      var url = 'https://api.klipy.com/api/v1/' + KLIPY_API_KEY + '/gifs/recent/' + encodeURIComponent(customerId)
+        + '?page=1&per_page=24';
+
+      return fetch(url, { headers: { 'Content-Type': 'application/json' } }).then(function (r) {
+        if (r.status === 204) return null;
+        return r.json();
+      });
+    }).then(function (data) {
+      renderKlipyItems(data, scope, resultsEl);
+    }).catch(function (err) {
+      console.error('Klipy recent failed', err);
     });
   }
 
   function searchKlipy(scope, query, resultsEl) {
-    if (!query) { resultsEl.innerHTML = ''; return; }
+    if (!query) { loadRecentGifs(scope, resultsEl); return; }
 
-    // getMemberstackId() is asynchronous (returns a Promise) -- it must be
-    // resolved before the URL is built, or its value stringifies to the
-    // literal text "[object Promise]" instead of an actual id.
-    var idPromise = window.SlipSocial.getMemberstackId
-      ? window.SlipSocial.getMemberstackId().catch(function () { return 'anon'; })
-      : Promise.resolve('anon');
-
-    idPromise.then(function (customerId) {
-      // Confirmed from Nikol's Partner Panel code sample:
-      // GET /gifs/search?page&per_page&q&customer_id&locale&content_filter
-      // customer_id is a query param, NOT a path segment (the earlier bug).
+    getMemberstackIdOrAnon().then(function (customerId) {
+      // Confirmed from Partner Panel: customer_id is a query param here.
       var url = 'https://api.klipy.com/api/v1/' + KLIPY_API_KEY + '/gifs/search'
         + '?q=' + encodeURIComponent(query)
         + '&customer_id=' + encodeURIComponent(customerId)
         + '&page=1&per_page=24';
 
       return fetch(url, { headers: { 'Content-Type': 'application/json' } }).then(function (r) {
-        if (r.status === 204) return null; // no content -- treat as zero results, don't attempt to parse
+        if (r.status === 204) return null;
         return r.json();
       });
     }).then(function (data) {
-      resultsEl.innerHTML = '';
-      if (!data) return; // zero results
-      // Confirmed real shape: { result, data: { data: [...items], current_page, per_page, has_next } }
-      // Each item: file.{hd,md,sm,xs}.{gif,webp,jpg,mp4,webm}.url
-      var items = (data && data.data && data.data.data) || [];
-      items.forEach(function (item) {
-        if (!item.file) return;
-        var thumbUrl = item.file.sm && item.file.sm.gif && item.file.sm.gif.url;   // fast-loading grid preview
-        var fullUrl = (item.file.md && item.file.md.gif && item.file.md.gif.url) ||
-          (item.file.hd && item.file.hd.gif && item.file.hd.gif.url) || thumbUrl; // stored on selection
-        if (!thumbUrl) return;
-
-        var img = document.createElement('img');
-        img.src = thumbUrl;
-        img.style.cursor = 'pointer';
-        img.addEventListener('click', function () {
-          if (mediaCapReached(scope)) { showMediaWarning(scope, 'Max 10 items reached.'); return; }
-          addMediaItem(scope, { type: 'klipy_gif', url: fullUrl, ref_id: item.id ? String(item.id) : null, text: null, result: null, posted_at: null });
-        });
-        resultsEl.appendChild(img);
-      });
+      renderKlipyItems(data, scope, resultsEl);
     }).catch(function (err) {
       console.error('Klipy search failed', err);
+    });
+  }
+
+  // Shared by Search and Recent -- both return the identical response shape.
+  function renderKlipyItems(data, scope, resultsEl) {
+    resultsEl.innerHTML = '';
+    if (!data) return; // zero results / 204
+    var items = (data && data.data && data.data.data) || [];
+    items.forEach(function (item) {
+      if (!item.file) return;
+      var thumbUrl = item.file.sm && item.file.sm.gif && item.file.sm.gif.url;
+      var fullUrl = (item.file.md && item.file.md.gif && item.file.md.gif.url) ||
+        (item.file.hd && item.file.hd.gif && item.file.hd.gif.url) || thumbUrl;
+      if (!thumbUrl) return;
+
+      var img = document.createElement('img');
+      img.src = thumbUrl;
+      img.style.cursor = 'pointer';
+      img.addEventListener('click', function () {
+        if (mediaCapReached(scope)) { showMediaWarning(scope, 'Max 10 items reached.'); return; }
+        addMediaItem(scope, { type: 'klipy_gif', url: fullUrl, ref_id: item.id ? String(item.id) : null, text: null, result: null, posted_at: null });
+      });
+      resultsEl.appendChild(img);
     });
   }
 
