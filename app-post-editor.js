@@ -201,15 +201,7 @@
         var orderField = slots[idx].querySelector('[data-field="media-slot-order"]');
         if (orderField) orderField.textContent = String(idx + 1);
         var removeBtn = slots[idx].querySelector('.data-slot-remove');
-        if (removeBtn) {
-          removeBtn.style.display = 'none';
-          removeBtn.addEventListener('click', (function (slotIndex, scope) {
-            return function (e) {
-              e.preventDefault();
-              removeMediaItem(scope, slotIndex);
-            };
-          })(idx, container.getAttribute('data-slot-container')));
-        }
+        if (removeBtn) removeBtn.style.display = 'none'; // no longer clickable -- removal happens by clicking the media itself
       }
     });
   }
@@ -224,24 +216,26 @@
     if (!container) return;
     var slots = container.children;
     for (var i = 0; i < slots.length; i++) {
-      fillSlot(slots[i], state.mediaItems[i]);
+      fillSlot(slots[i], state.mediaItems[i], scope, i);
     }
   }
 
-  function fillSlot(slotEl, item) {
+  function fillSlot(slotEl, item, scope, index) {
     var orderField = slotEl.querySelector('[data-field="media-slot-order"]');
+    var labelField = slotEl.querySelector('[data-field="media-slot-label"]');
     var removeBtn = slotEl.querySelector('.data-slot-remove');
     var injected = slotEl.querySelector('[data-injected-media]');
     if (injected) injected.remove();
 
     if (!item) {
       if (orderField) orderField.style.display = '';
+      if (labelField) labelField.style.display = '';
       if (removeBtn) removeBtn.style.display = 'none';
       return;
     }
 
-    if (orderField) orderField.style.display = 'none';
-    if (removeBtn) removeBtn.style.display = '';
+    if (labelField) labelField.style.display = 'none';
+    if (removeBtn) removeBtn.style.display = 'none'; // no longer the removal trigger -- clicking the media itself is now
 
     var mediaEl;
     if (item.type === 'slip' && !item.url) {
@@ -257,7 +251,11 @@
     }
     mediaEl.classList.add('data-slot');
     mediaEl.setAttribute('data-injected-media', 'true');
-    slotEl.insertBefore(mediaEl, removeBtn || null);
+    mediaEl.style.cursor = 'pointer';
+    mediaEl.addEventListener('click', function () {
+      removeMediaItem(scope, index);
+    });
+    slotEl.appendChild(mediaEl);
   }
 
   function addMediaItem(scope, item) {
