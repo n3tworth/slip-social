@@ -320,10 +320,15 @@
       klipy: document.querySelector('[data-klipy-picker="' + scope + '"]'),
       slip: document.querySelector('[data-slip-picker="' + scope + '"]')
     };
+    var target = panels[which];
+    var alreadyOpen = target && target.classList.contains('is-visible');
+
     Object.keys(panels).forEach(function (key) {
       var el = panels[key];
       if (!el) return;
-      el.classList.toggle('is-visible', key === which);
+      // if the clicked panel was already open, close everything (second click = close);
+      // otherwise show only the clicked one, hide the other two
+      el.classList.toggle('is-visible', !alreadyOpen && key === which);
     });
   }
 
@@ -334,14 +339,19 @@
     document.querySelectorAll('[data-media-trigger]').forEach(function (btn) {
       var scope = btn.getAttribute('data-media-trigger');
       var type = btn.getAttribute('data-media-type');
-      if (type !== 'photo' && type !== 'video') return;
+      if (type !== 'photo') return; // single combined photo/video trigger now
 
       var fileInput = document.createElement('input');
       fileInput.type = 'file';
-      fileInput.accept = type === 'photo' ? 'image/*' : 'video/*';
+      fileInput.accept = 'image/*,video/*';
       fileInput.multiple = true;
       fileInput.style.display = 'none';
-      btn.appendChild(fileInput);
+      // Appended to body rather than inside btn -- a hidden input nested inside
+      // an interactive element (often an <a> in Webflow) can silently fail to
+      // forward .click() in some browsers. Keeping it detached and separate is
+      // the more reliable pattern, and is very possibly why file selection
+      // wasn't opening before.
+      document.body.appendChild(fileInput);
 
       btn.addEventListener('click', function (e) {
         e.preventDefault();
@@ -351,7 +361,8 @@
 
       fileInput.addEventListener('change', function () {
         Array.prototype.forEach.call(fileInput.files, function (file) {
-          handleUpload(scope, file, type);
+          var actualType = file.type.indexOf('video') === 0 ? 'video' : 'photo';
+          handleUpload(scope, file, actualType);
         });
         fileInput.value = '';
       });
