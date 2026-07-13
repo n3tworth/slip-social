@@ -14,13 +14,14 @@
      9. Schedule toggle + native datetime input
     10. Publish / Cancel / Save-to-Drafts + autosave
 
-   NOTE ON KLIPY: docs.klipy.com renders client-side, so the exact search
-   endpoint path/query-param name and response shape below are built from the
-   one confirmed pattern (the "recent" endpoint: 
-   https://api.klipy.com/api/v1/{API_KEY}/gifs/recent/{CUSTOMER_ID}) rather than
-   a verified search spec. Check the Partner Panel's own code sample before
-   shipping and adjust searchKlipy() if the path, "q" param name, or the
-   response's item/url field names differ.
+   NOTE ON KLIPY: search endpoint confirmed from Nikol's Partner Panel code
+   sample: GET /gifs/search?page&per_page&q&customer_id&locale&content_filter
+   (customer_id is a query param, not a path segment -- an earlier version
+   of this file had that wrong, which caused two consecutive empty 204
+   responses before the real endpoint was confirmed). Memes/Stickers/Clips
+   endpoints are presumed to follow the identical pattern with the content
+   type swapped in the path (e.g. /memes/search) -- not yet independently
+   confirmed, worth checking the Partner Panel if/when those get built.
 */
 (function () {
   if (window.SlipSocial && window.SlipSocial.postEditorLoaded) return;
@@ -557,12 +558,15 @@
       : Promise.resolve('anon');
 
     idPromise.then(function (customerId) {
-      // See file-header NOTE -- path/param names here are the best-confirmed
-      // guess, not a verified spec. Adjust to match Klipy's actual search docs.
-      var url = 'https://api.klipy.com/api/v1/' + KLIPY_API_KEY + '/gifs/search/' + customerId +
-        '?q=' + encodeURIComponent(query);
+      // Confirmed from Nikol's Partner Panel code sample:
+      // GET /gifs/search?page&per_page&q&customer_id&locale&content_filter
+      // customer_id is a query param, NOT a path segment (the earlier bug).
+      var url = 'https://api.klipy.com/api/v1/' + KLIPY_API_KEY + '/gifs/search'
+        + '?q=' + encodeURIComponent(query)
+        + '&customer_id=' + encodeURIComponent(customerId)
+        + '&page=1&per_page=24';
 
-      return fetch(url).then(function (r) {
+      return fetch(url, { headers: { 'Content-Type': 'application/json' } }).then(function (r) {
         if (r.status === 204) return null; // no content -- treat as zero results, don't attempt to parse
         return r.json();
       });
